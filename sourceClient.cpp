@@ -5,6 +5,17 @@
 
 #pragma warning(disable: 4996)
 
+void ClientMSG(SOCKET newConnection)
+{
+	char msg[256];
+	while (!recv(newConnection, NULL, 0, 0)) {
+		recv(newConnection, msg, sizeof(msg), NULL);
+		std::cout << ">>" << msg << std::endl;
+	}
+	std::cout << "Disconnected to server!" << std::endl;
+	return;
+}
+
 int main()
 {
 	//загружаємо бібліотеку
@@ -28,8 +39,23 @@ int main()
 	SOCKET newConnection = socket(AF_INET, SOCK_STREAM, NULL);
 	if (connect(newConnection, (SOCKADDR*)&addr, sizeof_addr) != 0)
 		std::cout << "Error connection!" << std::endl;
-	else
+	else {
 		std::cout << "Connected to server!" << std::endl; //connect return 0
+
+		//перевірка з'єднання
+		if (newConnection != 0) {
+			//опрацьовуємо повідомлення з сервера (отриманих від клієнтів)
+			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientMSG, (LPVOID)(newConnection), NULL, NULL);
+
+			//відправляємо повідомлення на сервер
+			char msg[256];
+			while (true) {
+				std::cin.getline(msg, sizeof(msg));
+				send(newConnection, msg, sizeof(msg), NULL);
+				Sleep(10);
+			}
+		}
+	}
 
 	system("pause");
 	return 0;

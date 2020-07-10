@@ -10,12 +10,19 @@ int counter = 0; //індекс з'єднання
 
 void ClientHandler(int index)
 {
-	//чекаємо від'єднання клієнта
-	if (recv(arrConnections[index], NULL, 0, 0) != 0)
-		std::cout << "Client " << index << " disconnected, ";
+	char msg[256];
+	while (!recv(arrConnections[index], NULL, 0, 0)) {
+		recv(arrConnections[index], msg, sizeof(msg), 0);
+		for (int i(0); i < 100; i++) {
+			if (i == index || !arrConnections[i])
+				continue;
+			send(arrConnections[i], msg, sizeof(msg), NULL);
+		}
+	}
+
 	counter == 0 ? counter : counter--;
-	std::cout << "counter: " << counter << std::endl;
 	arrConnections[index] = 0;
+	std::cout << "Client " << index << " disconnected, counter: " << counter << std::endl;
 	return;
 }
 
