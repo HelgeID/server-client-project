@@ -1,16 +1,24 @@
 ﻿#pragma comment(lib, "ws2_32.lib")
 
 #include <WinSock2.h>
+#include <string>
 #include <iostream>
 
 #pragma warning(disable: 4996)
 
 void ClientMSG(SOCKET newConnection)
 {
-	char msg[256];
+	int lenght;
 	while (!recv(newConnection, NULL, 0, 0)) {
-		recv(newConnection, msg, sizeof(msg), NULL);
+		//get lenght
+		recv(newConnection, (char*)&lenght, sizeof(int), NULL);
+		//get msg
+		char* msg = new char[lenght + 1];
+		msg[lenght] = '\0';
+		recv(newConnection, msg, lenght, NULL);
+		//print
 		std::cout << ">>" << msg << std::endl;
+		delete[] msg;
 	}
 	std::cout << "Disconnected to server!" << std::endl;
 	return;
@@ -48,10 +56,12 @@ int main()
 			CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientMSG, (LPVOID)(newConnection), NULL, NULL);
 
 			//відправляємо повідомлення на сервер
-			char msg[256];
+			std::string msg("");
 			while (true) {
-				std::cin.getline(msg, sizeof(msg));
-				send(newConnection, msg, sizeof(msg), NULL);
+				std::getline(std::cin, msg);
+				int lenght = msg.size();
+				send(newConnection, (char*)&lenght, sizeof(int), NULL);
+				send(newConnection, msg.c_str(), lenght, NULL);
 				Sleep(10);
 			}
 		}

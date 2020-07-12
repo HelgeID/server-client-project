@@ -10,14 +10,19 @@ int counter = 0; //індекс з'єднання
 
 void ClientHandler(int index)
 {
-	char msg[256];
+	int size_buff;
 	while (!recv(arrConnections[index], NULL, 0, 0)) {
-		recv(arrConnections[index], msg, sizeof(msg), 0);
+		recv(arrConnections[index], (char*)&size_buff, sizeof(int), NULL);
+		char* buff = new char[size_buff + 1];
+		buff[size_buff] = '\0';
+		recv(arrConnections[index], buff, size_buff, NULL);
 		for (int i(0); i < 100; i++) {
 			if (i == index || !arrConnections[i])
-				continue;
-			send(arrConnections[i], msg, sizeof(msg), NULL);
+				continue; //skip
+			send(arrConnections[i], (char*)&size_buff, sizeof(int), NULL);
+			send(arrConnections[i], buff, size_buff, NULL);
 		}
+		delete[] buff;
 	}
 
 	counter == 0 ? counter : counter--;
@@ -65,6 +70,12 @@ int main()
 					counter++; //загальне число клієнтів
 					std::cout << "new Client connected!" << std::endl;
 					CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, (LPVOID)(i), NULL, NULL);
+
+					//відправка повідомлення клієнту
+					std::string msg("Welcome our chat!");
+					int lenght(msg.size());
+					send(arrConnections[i], (char*)&lenght, sizeof(int), NULL);
+					send(arrConnections[i], msg.c_str(), lenght, NULL);
 					break;
 				}
 			}
