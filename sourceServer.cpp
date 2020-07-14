@@ -8,10 +8,19 @@
 SOCKET arrConnections[100]{ 0 }; //масив сокетів
 int counter = 0; //індекс з'єднання
 
-void ClientHandler(int index)
+enum Packet
 {
-	int size_buff;
-	while (!recv(arrConnections[index], NULL, 0, 0)) {
+	P_ChatMSG,
+	P_Test
+};
+
+bool ProcessPacket(int index, Packet ptype)
+{
+	switch (ptype)
+	{
+	case P_ChatMSG:
+	{
+		int size_buff;
 		recv(arrConnections[index], (char*)&size_buff, sizeof(int), NULL);
 		char* buff = new char[size_buff + 1];
 		buff[size_buff] = '\0';
@@ -19,10 +28,34 @@ void ClientHandler(int index)
 		for (int i(0); i < 100; i++) {
 			if (i == index || !arrConnections[i])
 				continue; //skip
+
+			Packet packet = P_ChatMSG;
+			send(arrConnections[i], (char*)&packet, sizeof(Packet), NULL);
+
 			send(arrConnections[i], (char*)&size_buff, sizeof(int), NULL);
 			send(arrConnections[i], buff, size_buff, NULL);
 		}
 		delete[] buff;
+		break;
+	}
+	case P_Test:
+		std::cout << "You have received the test packet!" << std::endl;
+		break;
+	default:
+		std::cout << "Unknown packet: " << ptype << std::endl;
+	}
+	return true;
+}
+
+void ClientHandler(int index)
+{
+	
+	while (!recv(arrConnections[index], NULL, 0, 0)) {
+		Packet packet;
+		recv(arrConnections[index], (char*)&packet, sizeof(Packet), NULL);
+
+		if (!ProcessPacket(index, packet))
+			break;
 	}
 
 	counter == 0 ? counter : counter--;
@@ -71,9 +104,17 @@ int main()
 					std::cout << "new Client connected!" << std::endl;
 					CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, (LPVOID)(i), NULL, NULL);
 
+					//відправка тестового пакета
+					Packet testpacket = P_Test;
+					send(arrConnections[i], (char*)&testpacket, sizeof(Packet), NULL);
+
 					//відправка повідомлення клієнту
 					std::string msg("Welcome our chat!");
 					int lenght(msg.size());
+
+					Packet packet = P_ChatMSG;
+					send(arrConnections[i], (char*)&packet, sizeof(Packet), NULL);
+
 					send(arrConnections[i], (char*)&lenght, sizeof(int), NULL);
 					send(arrConnections[i], msg.c_str(), lenght, NULL);
 					break;

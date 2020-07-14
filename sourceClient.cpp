@@ -6,19 +6,45 @@
 
 #pragma warning(disable: 4996)
 
-void ClientMSG(SOCKET newConnection)
+enum Packet
 {
-	int lenght;
-	while (!recv(newConnection, NULL, 0, 0)) {
-		//get lenght
-		recv(newConnection, (char*)&lenght, sizeof(int), NULL);
-		//get msg
-		char* msg = new char[lenght + 1];
+	P_ChatMSG,
+	P_Test
+};
+
+bool ProcessPacket(Packet ptype, const SOCKET& newConnection)
+{
+
+	switch (ptype)
+	{
+	case P_ChatMSG:
+	{
+		int lenght;
+		recv(newConnection, (char*)&lenght, sizeof(int), NULL); //get lenght
+		char* msg = new char[lenght + 1]; //get msg
 		msg[lenght] = '\0';
 		recv(newConnection, msg, lenght, NULL);
-		//print
 		std::cout << ">>" << msg << std::endl;
 		delete[] msg;
+		break;
+	}
+	case P_Test:
+		std::cout << "You have received the test packet!" << std::endl;
+		break;
+	default:
+		std::cout << "Unknown packet: " << ptype << std::endl;
+	}
+	return true;
+}
+
+void ClientMSG(const SOCKET newConnection)
+{
+	Packet ptype;
+	while (!recv(newConnection, NULL, 0, 0)) {
+		//get the packet type
+		recv(newConnection, (char*)&ptype, sizeof(Packet), NULL);
+		if (!ProcessPacket(ptype, newConnection))
+			break;
 	}
 	std::cout << "Disconnected to server!" << std::endl;
 	return;
@@ -60,6 +86,10 @@ int main()
 			while (true) {
 				std::getline(std::cin, msg);
 				int lenght = msg.size();
+
+				Packet packet = P_ChatMSG;
+				send(newConnection, (char*)&packet, sizeof(Packet), NULL);
+
 				send(newConnection, (char*)&lenght, sizeof(int), NULL);
 				send(newConnection, msg.c_str(), lenght, NULL);
 				Sleep(10);
