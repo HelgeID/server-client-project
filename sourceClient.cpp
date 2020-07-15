@@ -6,26 +6,88 @@
 
 #pragma warning(disable: 4996)
 
-enum Packet
-{
-	P_ChatMSG,
-	P_Test
-};
+SOCKET newConnection;
+enum Packet { P_ChatMSG, P_Test };
 
-bool ProcessPacket(Packet ptype, const SOCKET& newConnection)
+bool CloseClient()
 {
+	if (!recv(newConnection, NULL, 0, 0))
+		return false;
+	return true;
+}
 
+bool SentInt(int _int) {
+	int checkReturn(send(newConnection, (char*)&_int, sizeof(int), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvInt(int& _int) {
+	int checkReturn(recv(newConnection, (char*)&_int, sizeof(int), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool SentPacketType(Packet packet) {
+	int checkReturn(send(newConnection, (char*)&packet, sizeof(Packet), NULL));
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvPacketType(Packet& packet) {
+	int checkReturn(recv(newConnection, (char*)&packet, sizeof(Packet), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool SentStrig(std::string _string) {
+	if (!SentPacketType(P_ChatMSG))
+		return false;
+
+	int lenght = _string.size();
+	if (!SentInt(lenght))
+		return false;
+
+	int checkReturn(send(newConnection, _string.c_str(), lenght, NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvString(std::string& _string) {
+	int lenght;
+	if (!RecvInt(lenght))
+		return false;
+
+	char* msg = new char[lenght + 1];
+	msg[lenght] = '\0';
+	int checkReturn(recv(newConnection, msg, lenght, NULL));
+	_string = msg;
+	delete[] msg;
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool ProcessPacket(Packet ptype)
+{
 	switch (ptype)
 	{
 	case P_ChatMSG:
 	{
-		int lenght;
-		recv(newConnection, (char*)&lenght, sizeof(int), NULL); //get lenght
-		char* msg = new char[lenght + 1]; //get msg
-		msg[lenght] = '\0';
-		recv(newConnection, msg, lenght, NULL);
+		std::string msg("");
+		if (!RecvString(msg))
+			return false;
 		std::cout << ">>" << msg << std::endl;
-		delete[] msg;
 		break;
 	}
 	case P_Test:
@@ -37,16 +99,19 @@ bool ProcessPacket(Packet ptype, const SOCKET& newConnection)
 	return true;
 }
 
-void ClientMSG(const SOCKET newConnection)
+void ClientMSG()
 {
-	Packet ptype;
-	while (!recv(newConnection, NULL, 0, 0)) {
-		//get the packet type
-		recv(newConnection, (char*)&ptype, sizeof(Packet), NULL);
-		if (!ProcessPacket(ptype, newConnection))
+	Packet packet;
+	while (!CloseClient()) {
+		if (!RecvPacketType(packet))
+			break;
+
+		if (!ProcessPacket(packet))
 			break;
 	}
+
 	std::cout << "Disconnected to server!" << std::endl;
+	closesocket(newConnection);
 	return;
 }
 
@@ -70,11 +135,11 @@ int main()
 	std::cout << "Client loaded!\n";
 
 	//створюємо сокет
-	SOCKET newConnection = socket(AF_INET, SOCK_STREAM, NULL);
+	newConnection = socket(AF_INET, SOCK_STREAM, NULL);
 	if (connect(newConnection, (SOCKADDR*)&addr, sizeof_addr) != 0)
 		std::cout << "Error connection!" << std::endl;
 	else {
-		std::cout << "Connected to server!" << std::endl; //connect return 0
+		std::cout << "Connected to server!" << std::endl; //connect() return 0
 
 		//перевірка з'єднання
 		if (newConnection != 0) {
@@ -85,13 +150,8 @@ int main()
 			std::string msg("");
 			while (true) {
 				std::getline(std::cin, msg);
-				int lenght = msg.size();
-
-				Packet packet = P_ChatMSG;
-				send(newConnection, (char*)&packet, sizeof(Packet), NULL);
-
-				send(newConnection, (char*)&lenght, sizeof(int), NULL);
-				send(newConnection, msg.c_str(), lenght, NULL);
+				if (!SentStrig(msg))
+					break;
 				Sleep(10);
 			}
 		}

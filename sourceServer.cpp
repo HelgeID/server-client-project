@@ -8,56 +8,117 @@
 SOCKET arrConnections[100]{ 0 }; //масив сокетів
 int counter = 0; //індекс з'єднання
 
-enum Packet
-{
-	P_ChatMSG,
-	P_Test
-};
+enum Packet { P_ChatMSG, P_Test };
 
-bool ProcessPacket(int index, Packet ptype)
+bool CloseClient(int index)
 {
-	switch (ptype)
+	if (!recv(arrConnections[index], NULL, 0, 0))
+		return false;
+	return true;
+}
+
+bool SentInt(int index, int _int) {
+	int checkReturn(send(arrConnections[index], (char*)&_int, sizeof(int), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvInt(int index, int& _int) {
+	int checkReturn(recv(arrConnections[index], (char*)&_int, sizeof(int), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool SentPacketType(int index, Packet packet) {
+	int checkReturn(send(arrConnections[index], (char*)&packet, sizeof(Packet), NULL));
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvPacketType(int index, Packet& packet) {
+	int checkReturn(recv(arrConnections[index], (char*)&packet, sizeof(Packet), NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool SentStrig(int index, std::string _string) {
+	if (!SentPacketType(index, P_ChatMSG))
+		return false;
+
+	int lenght = _string.size();
+	if (!SentInt(index, lenght))
+		return false;
+
+	int checkReturn(send(arrConnections[index], _string.c_str(), lenght, NULL));
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool RecvString(int index, std::string& _string) {
+	int lenght;
+	if (!RecvInt(index, lenght))
+		return false;
+
+	char* msg = new char[lenght + 1];
+	msg[lenght] = '\0';
+	int checkReturn(recv(arrConnections[index], msg, lenght, NULL));
+	_string = msg;
+	delete[] msg;
+
+	if (checkReturn == SOCKET_ERROR)
+		return false;
+	return true;
+}
+
+bool ProcessPacket(int index, Packet packet)
+{
+	switch (packet)
 	{
 	case P_ChatMSG:
 	{
-		int size_buff;
-		recv(arrConnections[index], (char*)&size_buff, sizeof(int), NULL);
-		char* buff = new char[size_buff + 1];
-		buff[size_buff] = '\0';
-		recv(arrConnections[index], buff, size_buff, NULL);
-		for (int i(0); i < 100; i++) {
+		std::string msg("");
+		if (!RecvString(index, msg))
+			return false;
+
+		for (int i(0); i < 100; ++i) {
 			if (i == index || !arrConnections[i])
 				continue; //skip
 
-			Packet packet = P_ChatMSG;
-			send(arrConnections[i], (char*)&packet, sizeof(Packet), NULL);
-
-			send(arrConnections[i], (char*)&size_buff, sizeof(int), NULL);
-			send(arrConnections[i], buff, size_buff, NULL);
+			if (!SentStrig(i, msg))
+				std::cout << "Error sent msg!" << std::endl;
 		}
-		delete[] buff;
 		break;
 	}
 	case P_Test:
 		std::cout << "You have received the test packet!" << std::endl;
 		break;
 	default:
-		std::cout << "Unknown packet: " << ptype << std::endl;
+		std::cout << "Unknown packet: " << packet << std::endl;
 	}
 	return true;
 }
 
 void ClientHandler(int index)
 {
-	
-	while (!recv(arrConnections[index], NULL, 0, 0)) {
-		Packet packet;
-		recv(arrConnections[index], (char*)&packet, sizeof(Packet), NULL);
+	Packet packet;
+	while (!CloseClient(index)) {
+		if (!RecvPacketType(index, packet))
+			break;
 
 		if (!ProcessPacket(index, packet))
 			break;
 	}
 
+	closesocket(arrConnections[index]);
 	counter == 0 ? counter : counter--;
 	arrConnections[index] = 0;
 	std::cout << "Client " << index << " disconnected, counter: " << counter << std::endl;
@@ -105,18 +166,11 @@ int main()
 					CreateThread(NULL, NULL, (LPTHREAD_START_ROUTINE)ClientHandler, (LPVOID)(i), NULL, NULL);
 
 					//відправка тестового пакета
-					Packet testpacket = P_Test;
-					send(arrConnections[i], (char*)&testpacket, sizeof(Packet), NULL);
+					SentPacketType(i, P_Test);
 
 					//відправка повідомлення клієнту
 					std::string msg("Welcome our chat!");
-					int lenght(msg.size());
-
-					Packet packet = P_ChatMSG;
-					send(arrConnections[i], (char*)&packet, sizeof(Packet), NULL);
-
-					send(arrConnections[i], (char*)&lenght, sizeof(int), NULL);
-					send(arrConnections[i], msg.c_str(), lenght, NULL);
+					SentStrig(i, msg);
 					break;
 				}
 			}
